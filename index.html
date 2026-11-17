@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Layar Presentasi</title>
+    <!-- Tailwind CSS untuk Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS untuk WebRTC P2P Connection -->
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar untuk tampilan yang lebih rapi */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="bg-slate-900 min-h-screen flex flex-col font-sans text-slate-200">
+
+    <!-- Notifikasi Toast -->
+    <div id="toast" class="fixed top-5 right-5 px-6 py-3 rounded-lg shadow-2xl text-white font-medium transform transition-transform duration-300 translate-x-full opacity-0 z-50 flex items-center gap-3">
+        <span id="toast-message">Pesan Notifikasi</span>
+    </div>
+
+    <!-- Navbar/Header -->
+    <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white shadow-lg shadow-blue-500/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold text-white tracking-wide">MeetShare</h1>
+        </div>
+        <div class="text-slate-400 font-medium text-sm flex items-center gap-4">
+            <span id="clock" class="hidden sm:block">00:00</span>
+        </div>
+    </header>
+
+    <main class="flex-1 w-full max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- Panel Kontrol (Sidebar) -->
+        <aside class="bg-slate-800 rounded-2xl shadow-xl p-6 lg:col-span-1 h-fit flex flex-col gap-6 border border-slate-700">
+            
+            <!-- Profil & Nama -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Nama Tampilan Anda</label>
+                <input type="text" id="my-name" placeholder="Masukkan nama Anda..." class="w-full bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block p-3 outline-none transition">
+            </div>
+
+            <!-- Info ID Saya -->
+            <div class="bg-slate-900/50 border border-slate-700 p-4 rounded-xl text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                <p class="text-xs text-slate-400 font-semibold mb-2 uppercase tracking-wider">ID Meeting Anda</p>
+                <div class="flex items-center justify-center gap-2">
+                    <span id="my-id" class="text-lg font-bold text-blue-400 tracking-widest">Memuat...</span>
+                    <button id="copy-btn" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition" title="Salin ID">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <hr class="border-slate-700">
+
+            <!-- Panel Presenter -->
+            <div>
+                <h2 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd" />
+                    </svg>
+                    Sebagai Host / Presenter
+                </h2>
+                <button id="start-share" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition duration-200 flex justify-center items-center gap-2 shadow-lg shadow-blue-600/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
+                    Mulai Berbagi Layar
+                </button>
+                <button id="stop-share" class="w-full bg-red-500 hover:bg-red-600 text-white text-sm font-semibold py-3 px-4 rounded-xl transition duration-200 flex justify-center items-center gap-2 shadow-lg shadow-red-500/30 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
+                    </svg>
+                    Hentikan Berbagi
+                </button>
+            </div>
+
+            <hr class="border-slate-700">
+
+            <!-- Panel Klien -->
+            <div>
+                <h2 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                    </svg>
+                    Gabung sebagai Klien
+                </h2>
+                <input type="text" id="presenter-id" placeholder="Masukkan ID Meeting..." class="w-full bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block p-3 mb-3 outline-none transition">
+                <button id="join-stream" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition duration-200 flex justify-center items-center gap-2 shadow-lg shadow-emerald-600/30">
+                    Tonton Presentasi
+                </button>
+            </div>
+            
+        </aside>
+
+        <!-- Video Player (Main Area) -->
+        <section class="bg-black rounded-2xl shadow-2xl lg:col-span-3 aspect-video md:aspect-auto relative overflow-hidden flex items-center justify-center border border-slate-700 group">
+            
+            <!-- Placeholder saat tidak ada stream -->
+            <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center z-0 bg-slate-800">
+                <div class="bg-slate-700/50 p-6 rounded-full mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 opacity-80 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <p class="text-xl font-medium text-slate-200">Menunggu Presentasi</p>
+                <p class="text-sm opacity-70 mt-2 max-w-md">Bagikan layar Anda atau masukkan ID meeting untuk bergabung dan menonton.</p>
+            </div>
+
+            <!-- Elemen Video Utama -->
+            <video id="video-stream" class="w-full h-full object-contain relative z-10 hidden" autoplay playsinline controls></video>
+            
+            <!-- Overlay Identitas (Nama Host & Client) -->
+            <div id="participant-info" class="absolute bottom-4 left-4 right-4 z-20 flex justify-between items-end hidden">
+                <div class="bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-xl text-sm font-medium border border-white/10 shadow-lg flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold" id="host-avatar">H</div>
+                    <div>
+                        <p class="text-[10px] text-blue-300 uppercase tracking-wider font-semibold">Host / Presenter</p>
+                        <p id="host-name-display" class="font-bold">Menunggu...</p>
+                    </div>
+                </div>
+                
+                <div class="bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-xl text-sm font-medium border border-white/10 shadow-lg flex items-center gap-3">
+                    <div class="text-right">
+                        <p class="text-[10px] text-emerald-300 uppercase tracking-wider font-semibold">Viewer (Klien)</p>
+                        <p id="client-name-display" class="font-bold">Anda</p>
+                    </div>
+                    <div class="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold" id="client-avatar">V</div>
+                </div>
+            </div>
+
+            <!-- Indikator Status -->
+            <div id="status-indicator" class="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider z-20 flex items-center gap-2 hidden border border-white/10">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                <span id="status-text">LIVE</span>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // --- Sistem Notifikasi Kustom ---
+        function showNotification(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            
+            toastMsg.innerText = message;
+            
+            // Set warna berdasarkan tipe
+            toast.className = 'fixed top-5 right-5 px-6 py-3 rounded-lg shadow-lg text-white font-medium transform transition-all duration-300 z-50';
+            if (type === 'success') toast.classList.add('bg-emerald-500');
+            else if (type === 'error') toast.classList.add('bg-red-500');
+            else toast.classList.add('bg-blue-500');
+
+            // Tampilkan
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            });
+
+            // Sembunyikan setelah 3.5 detik
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+            }, 3500);
+        }
+
+        // Penanganan error khusus untuk batasan Canvas/Preview Sandbox
+        window.addEventListener('error', function(event) {
+            if (event.message && (event.message.includes('WebSocket') || event.message.includes('SecurityError'))) {
+                showNotification("Preview Sandbox memblokir koneksi (SecurityError). Aplikasi akan berfungsi normal saat di-hosting di GitHub Pages.", "error");
+                const idEl = document.getElementById('my-id');
+                if(idEl) {
+                    idEl.innerText = "DIBLOKIR SANDBOX";
+                    idEl.className = "text-sm font-bold text-red-500 tracking-wider";
+                }
+            }
+        });
+
+        // Update Jam di Header
+        setInterval(() => {
+            const clockEl = document.getElementById('clock');
+            if(clockEl) {
+                const now = new Date();
+                clockEl.innerText = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            }
+        }, 1000);
+
+        // --- Inisialisasi PeerJS ---
+        const generateShortId = () => Math.random().toString(36).substring(2, 6) + '-' + Math.random().toString(36).substring(2, 6);
+        
+        let peer;
+        try {
+            peer = new Peer(generateShortId()); 
+        } catch(e) {
+            console.error("Gagal memulai PeerJS:", e);
+        }
+        
+        let localStream = null;
+        let currentCall = null;
+        let dataConnection = null; // Menyimpan koneksi data untuk kirim pesan nama
+        let myPeerId = '';
+        let myName = "Anonim";
+
+        const nameInput = document.getElementById('my-name');
+        const myIdElement = document.getElementById('my-id');
+        const videoElement = document.getElementById('video-stream');
+        const videoPlaceholder = document.getElementById('video-placeholder');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        
+        const participantInfo = document.getElementById('participant-info');
+        const hostNameDisplay = document.getElementById('host-name-display');
+        const hostAvatar = document.getElementById('host-avatar');
+        const clientNameDisplay = document.getElementById('client-name-display');
+        const clientAvatar = document.getElementById('client-avatar');
+        
+        const btnStartShare = document.getElementById('start-share');
+        const btnStopShare = document.getElementById('stop-share');
+
+        // Update nama berdasarkan input user
+        nameInput.addEventListener('input', (e) => {
+            myName = e.target.value.trim() || "Anonim";
+        });
+
+        // Event saat terhubung ke server PeerJS
+        peer.on('open', id => {
+            myPeerId = id;
+            myIdElement.innerText = id;
+            console.log('Terhubung dengan ID:', id);
+        });
+
+        // Menerima Data (Seperti Nama) dari koneksi Klien atau Host lain
+        peer.on('connection', conn => {
+            conn.on('data', data => {
+                if (data.type === 'EXCHANGE_NAME') {
+                    const remoteName = data.name || "Anonim";
+                    
+                    if (localStream) {
+                        // Jika kita adalah Host, maka data ini datang dari Klien/Penonton
+                        clientNameDisplay.innerText = remoteName;
+                        clientAvatar.innerText = remoteName.charAt(0).toUpperCase();
+                        showNotification(`${remoteName} mulai menonton presentasi.`, "info");
+                        
+                        // Kirim balik nama Host ke Klien
+                        conn.send({ type: 'EXCHANGE_NAME', name: myName });
+                    } else {
+                        // Jika kita adalah Klien, data ini datang sebagai balasan dari Host
+                        hostNameDisplay.innerText = remoteName;
+                        hostAvatar.innerText = remoteName.charAt(0).toUpperCase();
+                        showNotification(`Menonton presentasi dari ${remoteName}.`, "info");
+                    }
+                }
+            });
+        });
+
+        // Fitur Copy ID
+        document.getElementById('copy-btn').addEventListener('click', () => {
+            if(myPeerId) {
+                const textArea = document.createElement("textarea");
+                textArea.value = myPeerId;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showNotification("ID berhasil disalin!", "success");
+                } catch (err) {
+                    showNotification("Gagal menyalin ID.", "error");
+                }
+                document.body.removeChild(textArea);
+            }
+        });
+
+        // Fungsi untuk mengatur tampilan video aktif beserta badge namanya
+        function showVideo(stream, isHost) {
+            videoPlaceholder.classList.add('hidden');
+            videoElement.classList.remove('hidden');
+            statusIndicator.classList.remove('hidden');
+            participantInfo.classList.remove('hidden'); // Menampilkan overlay badge
+            
+            videoElement.srcObject = stream;
+            
+            if (isHost) {
+                videoElement.muted = true; // Mute mic sendiri
+                statusText.innerText = "ANDA SEDANG LIVE";
+                
+                // Update badge untuk diri sendiri sebagai Host
+                hostNameDisplay.innerText = myName + " (Anda)";
+                hostAvatar.innerText = myName.charAt(0).toUpperCase();
+                clientNameDisplay.innerText = "Menunggu Klien...";
+                clientAvatar.innerText = "?";
+                
+            } else {
+                videoElement.muted = false; // Dengarkan suara Host
+                statusText.innerText = "MENONTON LIVE";
+                
+                // Update badge untuk diri sendiri sebagai Klien
+                clientNameDisplay.innerText = myName + " (Anda)";
+                clientAvatar.innerText = myName.charAt(0).toUpperCase();
+                hostNameDisplay.innerText = "Menghubungkan...";
+                hostAvatar.innerText = "H";
+            }
+        }
+
+        function hideVideo() {
+            videoPlaceholder.classList.remove('hidden');
+            videoElement.classList.add('hidden');
+            statusIndicator.classList.add('hidden');
+            participantInfo.classList.add('hidden');
+            videoElement.srcObject = null;
+            
+            btnStartShare.classList.remove('hidden');
+            btnStopShare.classList.add('hidden');
+        }
+
+        // --- LOGIKA PRESENTER (BERBAGI LAYAR) ---
+        btnStartShare.addEventListener('click', async () => {
+            if(nameInput.value.trim() === "") {
+                nameInput.focus();
+                return showNotification("Silakan isi Nama Tampilan Anda terlebih dahulu.", "error");
+            }
+
+            try {
+                localStream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: { cursor: "always" }, 
+                    audio: { echoCancellation: true, noiseSuppression: true } 
+                });
+                
+                showVideo(localStream, true);
+                showNotification("Berhasil membagikan layar! Klien sekarang bisa bergabung.", "success");
+                
+                btnStartShare.classList.add('hidden');
+                btnStopShare.classList.remove('hidden');
+
+                // Otomatis menjawab panggilan masuk dari klien dengan stream kita
+                peer.on('call', call => {
+                    currentCall = call;
+                    call.answer(localStream);
+                });
+                
+                // Hentikan presentasi jika pengguna klik 'Stop sharing' dari browser
+                localStream.getVideoTracks()[0].onended = () => stopSharing();
+
+            } catch (err) {
+                console.error("Gagal membagikan layar: ", err);
+                showNotification("Izin berbagi layar ditolak atau dibatalkan.", "error");
+            }
+        });
+
+        // Fungsi menghentikan berbagi layar
+        function stopSharing() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (dataConnection) {
+                dataConnection.close();
+            }
+            hideVideo();
+            showNotification("Berbagi layar telah dihentikan.", "info");
+        }
+
+        btnStopShare.addEventListener('click', stopSharing);
+
+        // --- LOGIKA KLIEN (MENONTON LAYAR) ---
+        document.getElementById('join-stream').addEventListener('click', () => {
+            if(nameInput.value.trim() === "") {
+                nameInput.focus();
+                return showNotification("Silakan isi Nama Tampilan Anda terlebih dahulu.", "error");
+            }
+
+            const presenterId = document.getElementById('presenter-id').value.trim();
+            
+            if (!presenterId) {
+                return showNotification("Harap masukkan ID Meeting terlebih dahulu!", "error");
+            }
+
+            if (presenterId === myPeerId) {
+                return showNotification("Anda tidak bisa memanggil ID Anda sendiri.", "error");
+            }
+
+            showNotification("Menghubungkan ke Presenter...", "info");
+
+            // 1. Buat koneksi data khusus untuk saling bertukar Nama dengan Presenter
+            dataConnection = peer.connect(presenterId);
+            dataConnection.on('open', () => {
+                dataConnection.send({ type: 'EXCHANGE_NAME', name: myName });
+            });
+
+            // 2. Lakukan panggilan WebRTC untuk mendapatkan stream video
+            const call = peer.call(presenterId, null);
+            
+            call.on('stream', remoteStream => {
+                showVideo(remoteStream, false);
+                showNotification("Berhasil terhubung dengan Presenter!", "success");
+            });
+            
+            call.on('close', () => {
+                hideVideo();
+                showNotification("Presenter telah menghentikan presentasi.", "info");
+            });
+
+            call.on('error', err => {
+                console.error(err);
+                showNotification("Gagal terhubung. Pastikan ID benar dan Presenter sedang aktif.", "error");
+            });
+        });
+
+        // Error handling global
+        peer.on('error', err => {
+            console.error("PeerJS Error:", err);
+            if (err.type === 'peer-unavailable') {
+                showNotification("Presenter dengan ID tersebut tidak ditemukan atau sedang offline.", "error");
+            } else {
+                showNotification("Terjadi kesalahan koneksi: " + err.type, "error");
+            }
+        });
+
+    </script>
+</body>
+</html>
